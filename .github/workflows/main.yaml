@@ -1,0 +1,69 @@
+name: 'Main'
+
+defaults:
+  run:
+    shell: bash
+
+on:
+  push:
+  release:
+    types:
+      - released
+      - prereleased
+
+jobs:
+  test:
+    name: 'Action/test'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: |
+          # write_test_terraform
+          cat > main.tf <<-_EOF_
+          	resource "null_resource" "this" {
+          	  triggers = {
+          	    timestamp = timestamp()
+          	  }
+          	}
+
+          	output "null" {
+          	  value = null_resource.this.triggers
+          	}
+          	_EOF_
+      - name: Terraform fmt
+        uses: ./
+        with:
+          command: fmt
+          enable_init: false
+      - name: Terraform plan
+        uses: ./
+        with:
+          command: plan
+          enable_setup: false
+      - name: Terraform apply
+        uses: ./
+        with:
+          command: apply
+          enable_setup: false
+          enable_init: false
+      - id: terraform_output
+        name: Terraform output
+        uses: ./
+        with:
+          args: -json
+          command: output
+          enable_setup: false
+          enable_init: false
+      - run: |
+          # show_output
+          cat <<-_EOF_
+          	::group::output - raw
+          	${{ steps.terraform_output.outputs.stdout }}
+          	::endgroup::
+          	::group::output - fromJSON().null.value
+          	${{ fromJSON(steps.terraform_output.outputs.stdout).null.value.timestamp }}
+          	::endgroup::
+          	::group::output - jq
+          	$( jq .null.value <<< '${{ steps.terraform_output.outputs.stdout }}' )
+          	::endgroup::
+          	_EOF_

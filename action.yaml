@@ -1,0 +1,83 @@
+name: "stordco/actions-terraform"
+
+branding:
+  color: "blue"
+  icon: "message-circle"
+
+description: "Multi-workspace Terraform Cloud runner"
+
+inputs:
+  args:
+    default: ""
+    description: "Terraform command arguments (optional)"
+    type: string
+  command:
+    description: "Terraform command (ie: apply, plan)"
+    required: true
+    type: string
+  enable_init:
+    default: true
+    description: "Init before running (use false for successive runs)"
+  enable_setup:
+    default: true
+    description: "Use hashicorp/setup-terraform"
+  log:
+    default: "off"
+    description: "Terraform detailed log level"
+  tfe_token:
+    default: false
+    description: "Terraform Cloud Token"
+  version:
+    default: "latest"
+    description: "Terraform Version"
+    type: string
+  workspace:
+    description: "Terraform environment/workspace"
+    type: string
+
+outputs:
+  exitcode:
+    description: "Terraform command exit code"
+    value: ${{ steps.run.outputs.exitcode }}
+  stderr:
+    description: "Terraform output (STDERR)"
+    value: ${{ steps.run.outputs.stderr }}
+  stdout:
+    description: "Terraform output (STDOUT)"
+    value: ${{ steps.run.outputs.stdout }}
+
+runs:
+  using: composite
+  steps:
+    - if: inputs.enable_setup == 'true'
+      uses: hashicorp/setup-terraform@v1
+      with:
+        cli_config_credentials_token: ${{ inputs.tfe_token }}
+        terraform_version: ${{ inputs.version }}
+    - id: init
+      env:
+        TF_IN_AUTOMATION: true
+        TF_INPUT: false
+        TF_LOG: ${{ inputs.log }}
+        TF_WORKSPACE: ${{ inputs.workspace }}
+      if: inputs.enable_init == 'true'
+      run: |
+        # terraform/init
+        [ -f "${TF_WORKSPACE}.tfvars" ] && ln -s "${TF_WORKSPACE}.tfvars" "${TF_WORKSPACE}.auto.tfvars"
+        echo ::group::terraform/init
+        terraform init
+        echo ::endgroup::
+      shell: bash
+    - id: run
+      env:
+        TF_CLI_ARGS_apply: "-auto-approve"
+        TF_IN_AUTOMATION: true
+        TF_INPUT: false
+        TF_LOG: ${{ inputs.log }}
+        TF_WORKSPACE: ${{ inputs.workspace }}
+      run: |
+        # terraform/${{ inputs.command }}
+        echo '::group::terraform/${{ inputs.command }}'
+        terraform '${{ inputs.command }}' ${{ inputs.args }}
+        echo ::endgroup::
+      shell: bash
