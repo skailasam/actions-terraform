@@ -71,6 +71,7 @@ runs:
     - id: run
       env:
         TF_CLI_ARGS_apply: "-auto-approve"
+        TF_CLI_ARGS_destroy: "-auto-approve"
         TF_IN_AUTOMATION: true
         TF_INPUT: false
         TF_LOG: ${{ inputs.log }}
